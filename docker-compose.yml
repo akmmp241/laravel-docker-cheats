@@ -1,0 +1,100 @@
+services:
+
+  # web-server service is for nginx Web Server
+  web-server:
+    image: nginx:alpine
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+      # You can change which port you want to forward
+      - "8000:80"
+    volumes_from:
+      - app
+    volumes:
+      - ./nginx/app.conf:/etc/nginx/nginx.conf
+    networks:
+      - YOUR_NET
+    depends_on:
+      - app
+
+  app:
+    # use public image
+    image: YOUR_IMAGE
+    container_name: CONTAINER_NAME
+    restart: unless-stopped
+    working_dir: /var/www/html
+    environment:
+      DB_HOST: db
+      APP_ENV: production
+      APP_DEBUG: false
+      # change this
+      APP_URL: YOUR_APP_URL
+      # change this
+      ASSET_URL: YOUR_APP_ASSET_URL
+    volumes:
+      - app_source:/var/www/html
+      - storage:/var/www/html/storage
+    networks:
+      - YOUR_NET
+    depends_on:
+      - db
+
+  # this service will optimize to production ready
+  optimize:
+    # use pemilos public image
+    image: YOUR_IMAGE
+    container_name: CONTAINER_NAME
+    restart: on-failure
+    volumes_from:
+      - app
+    environment:
+      DB_HOST: db
+    working_dir: /var/www/html
+    entrypoint: [ "/bin/sh", "-c", "php artisan storage:link && php artisan optimize && php artisan migrate --force && php artisan db:seed --force" ]
+    networks:
+      - YOUR_NET
+    depends_on:
+      - app
+      - db
+
+  artisan:
+    # use public image
+    image: YOUR_IMAGE
+    container_name: CONTAINER_NAME
+    restart: on-failure
+    working_dir: /var/www/html
+    environment:
+      DB_HOST: db
+    volumes_from:
+      - app
+    networks:
+      - YOUR_NET
+    entrypoint: [ "php", "/var/www/html/artisan" ]
+    depends_on:
+      - app
+      - db
+
+  db:
+    image: mysql:8.4
+    container_name: prod-pemilos-db
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: YOUR_ROOT_PASSWORD
+      MYSQL_DATABASE: YOUR_DB_NAME
+      MYSQL_USER: YOUR_DB_USER
+      MYSQL_PASSWORD: YOUR_DB_PASSWORD
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - YOUR_NET
+
+volumes:
+  db_data:
+  storage:
+  app_source:
+
+networks:
+  YOUR_NET:
+    driver: bridge
